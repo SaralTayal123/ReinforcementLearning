@@ -1,5 +1,5 @@
 # ReinforcementLearning
-Random RL projects I've been working on
+Random RL projects I've been working on. This REPO just work-in-progress files mostly for backup
 
 ## Projects: <br />
 __Mario DQN via CNN__: DQNspeedyboiRevamped.ipynb (great name, I know)(works decently after a lot of optimization. Still needs more training time...) <br />
