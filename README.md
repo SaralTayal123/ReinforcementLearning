@@ -9,6 +9,6 @@ __PPO__: agents-ppo.ipynb (used this to try and solve gym-carracing. No luck. Pr
 __SAC__: agents-ppo.ipynb (same problem...)  <br />
 
 ## Future:   <br />
-__Chrome Dinosaur game__: Use PIL screengrab or MSS to capture the screen. Use selenium python or keyboard automation for control. use opencv to preprocess images before downsampling (canny edges?)
+__Chrome Dinosaur game__: Use PIL screengrab or MSS to capture the screen. Use selenium python or keyboard automation for control. use opencv to preprocess images before downsampling (canny edges?). <br />
 __Snake game__: out in the far future <br />
 __Some sort of physical game__. No clue what. Will need to use a more sample efficient algo due to real world correlation. Maybe Actor critic etc...
