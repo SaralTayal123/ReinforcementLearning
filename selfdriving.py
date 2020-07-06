@@ -1,29 +1,35 @@
-import numpy as np
-import cv2 as cv2
-from PIL import Image, ImageEnhance, ImageOps
-import time
-import tqdm as tqdm
-from tensorflow.keras.layers import Dense, Flatten, Conv2D, MaxPooling2D
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.optimizers import Adam
-import tensorflow as tf
-from tensorflow.keras.models import model_from_json
-
-#RPI CODE:
-import serial
 import RPi.GPIO as GPIO  # Import Raspberry Pi GPIO library
+import blynklib
+from tensorflow.keras.models import model_from_json
+import tensorflow as tf
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Flatten, Conv2D, MaxPooling2D
+import time
+from PIL import Image, ImageEnhance, ImageOps
+import cv2 as cv2
+import numpy as np
+import pickle
+mport pandas as pd
+
+
 GPIO.setwarnings(False)  # Ignore warning for now
 GPIO.setmode(GPIO.BCM)  # Use physical pin numbering
-aiMode = 10
-arduinoControl = 18
-# Set pin 10 to be an input pin and set
-GPIO.setup(aiMode, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-GPIO.setup(arduinoControl, GPIO.OUT)
+motor = 13
+steering = 12
+GPIO.setup(motor, GPIO.OUT)
+GPIO.setup(steering, GPIO.OUT)
+motorServo = GPIO.PWM(motor, 50)
+motorServo.start(2.5)
+steeringServo = GPIO.PWM(steering, 50)
+steeringServo.start(5)
 
 
 class Agent:
     def __init__(self):
         #This is the actual Neural net
+        self.userSteering = 90
+        self.aiMode = False
         model = Sequential([
             Conv2D(32, (7, 7), input_shape=(240, 320, 3),
                    strides=(2, 2), activation='relu', padding='same'),
@@ -61,7 +67,6 @@ class Agent:
         self.zeros2[:, :, 3:6] = 1
         self.zeros3[:, :, 6:9] = 1
         self.zeros4[:, :, 9:12] = 1
-        self.ser = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)
 
         self.cap = cv2.VideoCapture(0)
         self.cap.set(3, 320)
@@ -71,10 +76,10 @@ class Agent:
         processedImg = self._processImg(img)
         state = self._imageBankHandler(processedImg)
         state = np.reshape(state, (1, 240, 320, 3))
-        action = self.model.predict(state) * 180
-        action = str(action).encode('utf-8')
-        self.ser.write(action)
+        action = self.model.predict(state)
+        steeringServo.ChangeDutyCycle((action * 6)+4)  # range of 4-10
         return action
+    #TODO:insert pwm control
 
     def remember(self, state, action):
         state = self._processImg(state)
@@ -104,7 +109,7 @@ class Agent:
         self.yTrain = []
 
     def _processImg(self, img):
-        # img = Image.fromarray(img)
+       # img = Image.fromarray(img)
        # img = self._contrast(img)
 
         #You can use the following open CV code segment to test your in game screenshots
@@ -140,7 +145,6 @@ class Agent:
         self.imageBank.append(np.reshape(img, (240, 320, 3)) * self.ones)
 
         return toReturn
-
     def getState(self):
 
         ret, frame = self.cap.read()
@@ -153,35 +157,53 @@ class Agent:
         # if cv2.waitKey(1) & 0xFF == ord('q'):
         #     break
 
-
-def observeAction(self):
-      self.ser.flush()
-#        self.ser.reset_output_buffer()
-       if self.ser.in_waiting > 0:
-            line = self.ser.readline().decode('utf-8').rstrip()
-            print(line)
-            self.ser.reset_input_buffer()
-            return int(line, base=10)
-        return -1
+    def observeAction(self):
+        return (self.userSteering - 4) / 6
 
 
 agent = Agent()  # currently agent is configured with only 2 actions
+BLYNK_AUTH = 'MGbFmANkyThXj6e36bE0JnPDWK7V84Xy'
+blynk = blynklib.Blynk(BLYNK_AUTH)
+aiMode = False
+
+def servoControl(value):
+    steeringServo.ChangeDutyCycle(value)
+
+
+@blynk.handle_event('write V4')
+def write_virtual_pin_handler(pin, value):
+    print("value: ",float(value[0]))
+    agent.userSteering = float(value[0])
+    servoControl(float(value[0]))
+
+@blynk.handle_event('write V2')
+def write_virtual_pin_handler(pin, value):
+    if value == 1:
+        agent.aiMode = False
+    else:
+        agent.aiMode = True
+
+
+counter = 0
 while True:  # CHANGE to while button pressed or something
-    if GPIO.input(aiMode) == GPIO.LOW:
-        print("GPIO LOW")
-        GPIO.output(arduinoControl, GPIO.LOW)  # TODO: FLIP LOGIC
+    blynk.run()
+    if agent.aiMode == False:
+        print("Manual Control")
         state = agent.getState()
         action = agent.observeAction()
-        if action >= 0:  # if its a valid action
-            agent.remember(state, action/180)
-            print("Remembering: ", action)
+        if action >= 0: #if its a valid action
+            agent.remember(state, action)
+            counter += 1
+            if counter % 100 == 0:
+                filehandler = open('aiMemoryPickle', "wb")
+                pickle.dump(agent.memory, filehandler)
+                filehandler.close()
     else:
-        GPIO.output(arduinoControl, GPIO.HIGH)  # TODO: FLIP LOGIC
-        print("GPIO HIGH")
+        print("AI Control")
         agent.learn()
         agent.model.save_weights("selfdrive.h5")
-        while GPIO.input(aiMode) == GPIO.HIGH:
+        while agent.aiMode == True:
             state = agent.getState()
             action = agent.act(state)
             print("action", action)
-                                                                                                                                                                                                                            183, 13        Bot
+                                                                                                                                                                                                                                                                                                            207,1         Bot
